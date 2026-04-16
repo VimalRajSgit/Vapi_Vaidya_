@@ -6,7 +6,7 @@ load_dotenv()
 
 VAPI_API_KEY = os.getenv("VAPI_API_KEY")
 
-YOUR_BACKEND_URL = "https://1454-2409-40f2-3f-fcbe-3656-7914-94a1-3828.ngrok-free.app"
+YOUR_BACKEND_URL = "https://28a2-2409-40f2-216f-8b11-32d-6f15-1abc-740f.ngrok-free.app"
 
 response = requests.post(
     "https://api.vapi.ai/assistant",
@@ -22,13 +22,14 @@ response = requests.post(
             "model": "vaidya-test"
         },
         "voice": {
-            "provider": "vapi",
-            "voiceId": "Elliot"
+            "provider": "azure",
+            "voiceId": "kn-IN-GaganNeural"
         },
         "transcriber": {
-            "provider": "deepgram",
-            "language": "en"
-        },
+            "provider": "azure",
+            "language": "kn-IN"
+        }
+        ,
         "firstMessage": "Namaste, I am Vaidya. How can I help you today?"
     }
 )

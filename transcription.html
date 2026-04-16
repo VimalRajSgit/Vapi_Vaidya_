@@ -1,0 +1,1389 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Chiku — Doctor's Assistant</title>
+        <style>
+            @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400;500&display=swap");
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            :root {
+                --bg: #f7f5f0;
+                --paper: #fffef9;
+                --paper2: #f2f0ea;
+                --ink: #1a1916;
+                --ink2: #4a4740;
+                --ink3: #8a8780;
+                --rule: rgba(26, 25, 22, 0.1);
+                --rule2: rgba(26, 25, 22, 0.06);
+                --chiku: #1a5c3a;
+                --chiku-bg: #eaf5ee;
+                --chiku-border: rgba(26, 92, 58, 0.2);
+                --wake: #c4410c;
+                --wake-bg: #fff0ea;
+                --pulse: rgba(26, 92, 58, 0.4);
+                --recording-ring: rgba(196, 65, 12, 0.35);
+            }
+
+            body {
+                font-family: "Geist Mono", monospace;
+                background: var(--bg);
+                color: var(--ink);
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            /* Subtle paper texture via repeating lines */
+            body::before {
+                content: "";
+                position: fixed;
+                inset: 0;
+                background-image: repeating-linear-gradient(
+                    to bottom,
+                    transparent,
+                    transparent 27px,
+                    var(--rule2) 27px,
+                    var(--rule2) 28px
+                );
+                pointer-events: none;
+                z-index: 0;
+            }
+
+            header {
+                position: relative;
+                z-index: 10;
+                padding: 14px 28px;
+                background: var(--paper);
+                border-bottom: 1px solid var(--rule);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+            }
+
+            .brand-icon {
+                width: 38px;
+                height: 38px;
+                border-radius: 50%;
+                background: var(--chiku-bg);
+                border: 1px solid var(--chiku-border);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: "Instrument Serif", serif;
+                font-size: 18px;
+                color: var(--chiku);
+                letter-spacing: -0.02em;
+            }
+
+            .brand-text h1 {
+                font-family: "Instrument Serif", serif;
+                font-size: 20px;
+                font-weight: 400;
+                color: var(--ink);
+                letter-spacing: -0.01em;
+            }
+
+            .brand-text p {
+                font-size: 10px;
+                color: var(--ink3);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-top: 1px;
+            }
+
+            .header-right {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+            }
+
+            .session-timer {
+                font-size: 13px;
+                color: var(--ink3);
+                letter-spacing: 0.05em;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .settings-btn {
+                background: transparent;
+                border: 1px solid var(--rule);
+                color: var(--ink3);
+                padding: 5px 13px;
+                border-radius: 6px;
+                font-family: "Geist Mono", monospace;
+                font-size: 11px;
+                cursor: pointer;
+                letter-spacing: 0.05em;
+                transition:
+                    color 0.2s,
+                    border-color 0.2s;
+            }
+            .settings-btn:hover {
+                color: var(--ink);
+                border-color: rgba(26, 25, 22, 0.25);
+            }
+
+            /* Main layout */
+            .main {
+                flex: 1;
+                display: grid;
+                grid-template-columns: 1fr 300px;
+                overflow: hidden;
+                position: relative;
+                z-index: 1;
+            }
+
+            /* Transcript panel */
+            .transcript-panel {
+                display: flex;
+                flex-direction: column;
+                border-right: 1px solid var(--rule);
+                overflow: hidden;
+            }
+
+            .panel-header {
+                padding: 12px 24px;
+                border-bottom: 1px solid var(--rule2);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: var(--paper);
+                flex-shrink: 0;
+            }
+
+            .panel-label {
+                font-size: 10px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                color: var(--ink3);
+            }
+
+            .live-badge {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 10px;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--ink3);
+            }
+
+            .live-dot {
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: var(--ink3);
+            }
+
+            .live-dot.active {
+                background: var(--chiku);
+                animation: livepulse 1.5s infinite;
+            }
+
+            .live-dot.wake-active {
+                background: var(--wake);
+                animation: livepulse 0.6s infinite;
+            }
+
+            @keyframes livepulse {
+                0%,
+                100% {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+                50% {
+                    opacity: 0.5;
+                    transform: scale(0.85);
+                }
+            }
+
+            .transcript-scroll {
+                flex: 1;
+                overflow-y: auto;
+                padding: 20px 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .transcript-scroll::-webkit-scrollbar {
+                width: 3px;
+            }
+            .transcript-scroll::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .transcript-scroll::-webkit-scrollbar-thumb {
+                background: var(--rule);
+                border-radius: 2px;
+            }
+
+            .transcript-entry {
+                display: flex;
+                gap: 14px;
+                padding: 6px 0;
+                border-bottom: 1px solid var(--rule2);
+                animation: slideIn 0.2s ease;
+            }
+
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(4px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .entry-time {
+                font-size: 10px;
+                color: var(--ink3);
+                letter-spacing: 0.04em;
+                flex-shrink: 0;
+                padding-top: 2px;
+                width: 52px;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .entry-text {
+                font-size: 13.5px;
+                line-height: 1.7;
+                color: var(--ink2);
+                flex: 1;
+            }
+
+            .entry-text.interim {
+                color: var(--ink3);
+                font-style: italic;
+            }
+
+            .entry-text .wake-highlight {
+                color: var(--wake);
+                font-weight: 500;
+            }
+
+            .empty-state {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                flex: 1;
+                gap: 10px;
+                color: var(--ink3);
+                text-align: center;
+                padding: 40px;
+            }
+
+            .empty-state .big-icon {
+                font-family: "Instrument Serif", serif;
+                font-size: 48px;
+                opacity: 0.2;
+                line-height: 1;
+            }
+
+            .empty-state p {
+                font-size: 12px;
+                letter-spacing: 0.06em;
+                line-height: 1.8;
+            }
+
+            /* Right sidebar */
+            .sidebar {
+                display: flex;
+                flex-direction: column;
+                background: var(--paper);
+                overflow: hidden;
+            }
+
+            /* Mic control */
+            .mic-section {
+                padding: 24px;
+                border-bottom: 1px solid var(--rule);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 16px;
+                flex-shrink: 0;
+            }
+
+            .mic-ring {
+                position: relative;
+                width: 80px;
+                height: 80px;
+                cursor: pointer;
+            }
+
+            .mic-ring-outer {
+                position: absolute;
+                inset: 0;
+                border-radius: 50%;
+                border: 1.5px solid var(--rule);
+                transition: border-color 0.3s;
+            }
+
+            .mic-ring.on .mic-ring-outer {
+                border-color: var(--chiku-border);
+                animation: ringpulse 2s infinite;
+            }
+
+            .mic-ring.wake .mic-ring-outer {
+                border-color: rgba(196, 65, 12, 0.4);
+                animation: ringpulse-wake 0.8s infinite;
+            }
+
+            @keyframes ringpulse {
+                0%,
+                100% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+                50% {
+                    transform: scale(1.08);
+                    opacity: 0.7;
+                }
+            }
+            @keyframes ringpulse-wake {
+                0%,
+                100% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+                50% {
+                    transform: scale(1.12);
+                    opacity: 0.8;
+                }
+            }
+
+            .mic-btn-main {
+                position: absolute;
+                inset: 8px;
+                border-radius: 50%;
+                border: none;
+                background: var(--paper2);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+
+            .mic-ring.on .mic-btn-main {
+                background: var(--chiku-bg);
+            }
+
+            .mic-ring.wake .mic-btn-main {
+                background: var(--wake-bg);
+            }
+
+            .mic-btn-main svg {
+                width: 22px;
+                height: 22px;
+                fill: var(--ink3);
+                transition: fill 0.2s;
+            }
+
+            .mic-ring.on .mic-btn-main svg {
+                fill: var(--chiku);
+            }
+            .mic-ring.wake .mic-btn-main svg {
+                fill: var(--wake);
+            }
+
+            .mic-label {
+                font-size: 11px;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--ink3);
+                text-align: center;
+                line-height: 1.5;
+            }
+
+            .mic-label span {
+                display: block;
+                font-size: 10px;
+                color: var(--ink3);
+                opacity: 0.7;
+                margin-top: 2px;
+            }
+
+            /* Chiku status */
+            .chiku-section {
+                padding: 16px 20px;
+                border-bottom: 1px solid var(--rule);
+                flex-shrink: 0;
+            }
+
+            .chiku-section-label {
+                font-size: 10px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                color: var(--ink3);
+                margin-bottom: 12px;
+            }
+
+            .chiku-status {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 10px 12px;
+                border-radius: 8px;
+                background: var(--paper2);
+                border: 1px solid var(--rule);
+                min-height: 48px;
+                transition:
+                    background 0.3s,
+                    border-color 0.3s;
+            }
+
+            .chiku-status.awake {
+                background: var(--chiku-bg);
+                border-color: var(--chiku-border);
+            }
+
+            .chiku-status.speaking {
+                background: var(--wake-bg);
+                border-color: rgba(196, 65, 12, 0.2);
+            }
+
+            .chiku-avatar {
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                background: var(--paper);
+                border: 1px solid var(--rule);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: "Instrument Serif", serif;
+                font-size: 13px;
+                color: var(--ink3);
+                flex-shrink: 0;
+                transition:
+                    border-color 0.3s,
+                    color 0.3s;
+            }
+
+            .chiku-status.awake .chiku-avatar,
+            .chiku-status.speaking .chiku-avatar {
+                border-color: var(--chiku);
+                color: var(--chiku);
+            }
+
+            .chiku-msg {
+                font-size: 12px;
+                color: var(--ink3);
+                line-height: 1.5;
+            }
+
+            .chiku-status.awake .chiku-msg,
+            .chiku-status.speaking .chiku-msg {
+                color: var(--chiku);
+            }
+
+            .chiku-status.speaking .chiku-msg {
+                color: var(--wake);
+            }
+
+            /* Sound wave animation */
+            .wave {
+                display: flex;
+                gap: 2px;
+                align-items: center;
+                margin-left: 4px;
+            }
+            .wave span {
+                display: inline-block;
+                width: 3px;
+                background: var(--wake);
+                border-radius: 2px;
+                animation: waveBar 0.8s infinite;
+                height: 4px;
+            }
+            .wave span:nth-child(2) {
+                animation-delay: 0.1s;
+                height: 8px;
+            }
+            .wave span:nth-child(3) {
+                animation-delay: 0.2s;
+                height: 12px;
+            }
+            .wave span:nth-child(4) {
+                animation-delay: 0.3s;
+                height: 8px;
+            }
+            .wave span:nth-child(5) {
+                animation-delay: 0.4s;
+                height: 4px;
+            }
+            @keyframes waveBar {
+                0%,
+                100% {
+                    transform: scaleY(0.4);
+                }
+                50% {
+                    transform: scaleY(1);
+                }
+            }
+
+            /* Log */
+            .log-section {
+                flex: 1;
+                overflow-y: auto;
+                padding: 16px 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .log-section::-webkit-scrollbar {
+                width: 3px;
+            }
+            .log-section::-webkit-scrollbar-thumb {
+                background: var(--rule);
+            }
+
+            .log-header {
+                font-size: 10px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                color: var(--ink3);
+                margin-bottom: 4px;
+                flex-shrink: 0;
+            }
+
+            .log-entry {
+                padding: 8px 10px;
+                border-radius: 6px;
+                border: 1px solid var(--rule);
+                background: transparent;
+                animation: slideIn 0.2s ease;
+                flex-shrink: 0;
+            }
+
+            .log-entry.chiku-q {
+                border-color: var(--chiku-border);
+                background: var(--chiku-bg);
+            }
+
+            .log-entry .log-time {
+                font-size: 10px;
+                color: var(--ink3);
+                margin-bottom: 3px;
+            }
+
+            .log-entry .log-q {
+                font-size: 12px;
+                color: var(--chiku);
+                line-height: 1.5;
+            }
+
+            .log-entry .log-label {
+                font-size: 9px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                color: var(--ink3);
+                margin-bottom: 2px;
+            }
+
+            /* Bottom bar */
+            .bottom-bar {
+                padding: 10px 24px;
+                background: var(--paper);
+                border-top: 1px solid var(--rule);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                font-size: 11px;
+                color: var(--ink3);
+                flex-shrink: 0;
+                position: relative;
+                z-index: 10;
+            }
+
+            .conn-indicator {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .conn-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--ink3);
+            }
+            .conn-dot.ok {
+                background: var(--chiku);
+            }
+            .conn-dot.err {
+                background: var(--wake);
+            }
+
+            .export-btn {
+                background: transparent;
+                border: 1px solid var(--rule);
+                color: var(--ink3);
+                padding: 4px 12px;
+                border-radius: 5px;
+                font-family: "Geist Mono", monospace;
+                font-size: 10px;
+                cursor: pointer;
+                letter-spacing: 0.05em;
+                transition: color 0.2s;
+            }
+            .export-btn:hover {
+                color: var(--ink);
+            }
+
+            /* Config modal */
+            .overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(247, 245, 240, 0.85);
+                backdrop-filter: blur(3px);
+                z-index: 200;
+                align-items: center;
+                justify-content: center;
+            }
+            .overlay.open {
+                display: flex;
+            }
+
+            .modal {
+                background: var(--paper);
+                border: 1px solid var(--rule);
+                border-radius: 12px;
+                padding: 28px;
+                width: 420px;
+                max-width: 90vw;
+                box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+            }
+
+            .modal h2 {
+                font-family: "Instrument Serif", serif;
+                font-size: 20px;
+                font-weight: 400;
+                margin-bottom: 20px;
+            }
+
+            .field {
+                margin-bottom: 16px;
+            }
+            .field label {
+                display: block;
+                font-size: 11px;
+                letter-spacing: 0.07em;
+                text-transform: uppercase;
+                color: var(--ink3);
+                margin-bottom: 6px;
+            }
+            .field input {
+                width: 100%;
+                background: var(--bg);
+                border: 1px solid var(--rule);
+                border-radius: 7px;
+                color: var(--ink);
+                font-family: "Geist Mono", monospace;
+                font-size: 13px;
+                padding: 9px 12px;
+                outline: none;
+                transition: border-color 0.2s;
+            }
+            .field input:focus {
+                border-color: rgba(26, 92, 58, 0.35);
+            }
+            .field .hint {
+                font-size: 11px;
+                color: var(--ink3);
+                margin-top: 5px;
+                line-height: 1.5;
+            }
+
+            .modal-btns {
+                display: flex;
+                gap: 10px;
+                margin-top: 22px;
+                justify-content: flex-end;
+            }
+            .btn-primary {
+                background: var(--chiku);
+                color: #fff;
+                border: none;
+                border-radius: 7px;
+                padding: 9px 20px;
+                font-family: "Geist Mono", monospace;
+                font-size: 12px;
+                cursor: pointer;
+                letter-spacing: 0.04em;
+            }
+            .btn-secondary {
+                background: transparent;
+                color: var(--ink2);
+                border: 1px solid var(--rule);
+                border-radius: 7px;
+                padding: 9px 20px;
+                font-family: "Geist Mono", monospace;
+                font-size: 12px;
+                cursor: pointer;
+                letter-spacing: 0.04em;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="brand">
+                <div class="brand-icon">ಚ</div>
+                <div class="brand-text">
+                    <h1>Chiku</h1>
+                    <p>Doctor's Live Assistant</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="session-timer" id="timer">00:00:00</div>
+                <button class="settings-btn" onclick="openConfig()">
+                    ⚙ Settings
+                </button>
+            </div>
+        </header>
+
+        <div class="main">
+            <!-- Transcript panel -->
+            <div class="transcript-panel">
+                <div class="panel-header">
+                    <span class="panel-label">Live Transcription</span>
+                    <div class="live-badge">
+                        <div class="live-dot" id="liveDot"></div>
+                        <span id="liveLabel">Idle</span>
+                    </div>
+                </div>
+                <div class="transcript-scroll" id="transcriptScroll">
+                    <div class="empty-state" id="emptyState">
+                        <div class="big-icon">ಡ</div>
+                        <p>
+                            Start the microphone<br />to begin transcription.<br /><br />Say
+                            "hey Chiku" anytime<br />to ask a question.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right sidebar -->
+            <div class="sidebar">
+                <!-- Mic control -->
+                <div class="mic-section">
+                    <div class="mic-ring" id="micRing" onclick="toggleMic()">
+                        <div class="mic-ring-outer"></div>
+                        <button class="mic-btn-main" title="Toggle microphone">
+                            <svg
+                                viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <path
+                                    d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08C16.39 17.43 19 14.53 19 11h-2z"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="mic-label" id="micLabel">
+                        Click to start
+                        <span>Microphone off</span>
+                    </div>
+                </div>
+
+                <!-- Chiku status -->
+                <div class="chiku-section">
+                    <div class="chiku-section-label">Chiku Status</div>
+                    <div class="chiku-status" id="chikuStatus">
+                        <div class="chiku-avatar">ಚ</div>
+                        <div class="chiku-msg" id="chikuMsg">
+                            Listening for "hey Chiku..."
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Query log -->
+                <div class="log-section" id="logSection">
+                    <div class="log-header">Query Log</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-bar">
+            <div class="conn-indicator">
+                <div class="conn-dot" id="connDot"></div>
+                <span id="connText">Configure backend in Settings</span>
+            </div>
+            <button class="export-btn" onclick="exportTranscript()">
+                Export ↓
+            </button>
+        </div>
+
+        <!-- Config modal -->
+        <div class="overlay" id="configModal">
+            <div class="modal">
+                <h2>Settings</h2>
+                <div class="field">
+                    <label>Backend URL</label>
+                    <input
+                        type="text"
+                        id="cfgUrl"
+                        placeholder="http://localhost:8000"
+                    />
+                    <div class="hint">
+                        Your FastAPI server (localhost or ngrok URL). Used to
+                        send Chiku questions to Groq.
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Wake Phrase</label>
+                    <input type="text" id="cfgWake" placeholder="hey chiku" />
+                    <div class="hint">
+                        Case-insensitive. Say this to ask Chiku a question.
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Groq API Key (optional override)</label>
+                    <input type="password" id="cfgGroq" placeholder="gsk_..." />
+                    <div class="hint">
+                        Leave blank to route through your FastAPI backend.
+                    </div>
+                </div>
+                <div class="modal-btns">
+                    <button class="btn-secondary" onclick="closeConfig()">
+                        Cancel
+                    </button>
+                    <button class="btn-primary" onclick="saveConfig()">
+                        Save & Test
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const STORAGE_KEY = "chiku_config";
+            let config = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+            config.url = config.url || "http://localhost:8000";
+            config.wake = config.wake || "hey chiku";
+            config.groq = config.groq || "";
+
+            let isListening = false;
+            let recognition = null;
+            let sessionStart = null;
+            let timerInterval = null;
+            let transcriptLog = [];
+            let queryLog = [];
+            let isSpeaking = false;
+            let currentInterimEl = null;
+
+            /* ── helpers ── */
+            function ts() {
+                const d = new Date();
+                return d.toTimeString().slice(0, 8);
+            }
+
+            function elapsedSince(start) {
+                const s = Math.floor((Date.now() - start) / 1000);
+                const h = String(Math.floor(s / 3600)).padStart(2, "0");
+                const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+                const sec = String(s % 60).padStart(2, "0");
+                return `${h}:${m}:${sec}`;
+            }
+
+            /* ── config modal ── */
+            function openConfig() {
+                document.getElementById("cfgUrl").value = config.url;
+                document.getElementById("cfgWake").value = config.wake;
+                document.getElementById("cfgGroq").value = config.groq;
+                document.getElementById("configModal").classList.add("open");
+            }
+            function closeConfig() {
+                document.getElementById("configModal").classList.remove("open");
+            }
+            async function saveConfig() {
+                config.url = document
+                    .getElementById("cfgUrl")
+                    .value.trim()
+                    .replace(/\/$/, "");
+                config.wake =
+                    document
+                        .getElementById("cfgWake")
+                        .value.trim()
+                        .toLowerCase() || "hey chiku";
+                config.groq = document.getElementById("cfgGroq").value.trim();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+                closeConfig();
+                await checkConn();
+            }
+
+            /* ── connection ── */
+            async function checkConn() {
+                const dot = document.getElementById("connDot");
+                const text = document.getElementById("connText");
+                if (!config.url) {
+                    dot.className = "conn-dot";
+                    text.textContent = "Configure backend in Settings";
+                    return;
+                }
+                dot.className = "conn-dot";
+                text.textContent = "Checking...";
+                try {
+                    const r = await fetch(config.url + "/", {
+                        signal: AbortSignal.timeout(4000),
+                    });
+                    const d = await r.json();
+                    if (d.status === "ok") {
+                        dot.className = "conn-dot ok";
+                        text.textContent = "Connected · " + config.url;
+                    } else throw new Error("bad response");
+                } catch (e) {
+                    dot.className = "conn-dot err";
+                    text.textContent =
+                        "Cannot reach backend — check URL & server";
+                }
+            }
+
+            /* ── transcript DOM ── */
+            function hideEmpty() {
+                const e = document.getElementById("emptyState");
+                if (e) e.remove();
+            }
+
+            function addTranscriptEntry(text, isInterim) {
+                hideEmpty();
+                const scroll = document.getElementById("transcriptScroll");
+
+                if (isInterim) {
+                    // update or create interim line
+                    if (!currentInterimEl) {
+                        const wrap = document.createElement("div");
+                        wrap.className = "transcript-entry";
+                        wrap.id = "interim-entry";
+                        wrap.innerHTML = `<span class="entry-time">${ts()}</span><span class="entry-text interim"></span>`;
+                        scroll.appendChild(wrap);
+                        currentInterimEl = wrap.querySelector(".entry-text");
+                    }
+                    currentInterimEl.textContent = text;
+                } else {
+                    // remove interim
+                    const old = document.getElementById("interim-entry");
+                    if (old) old.remove();
+                    currentInterimEl = null;
+
+                    if (!text.trim()) return;
+
+                    // highlight wake phrase if present
+                    const wakeRx = new RegExp(
+                        "(" +
+                            config.wake.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
+                            ")",
+                        "i",
+                    );
+                    const wrap = document.createElement("div");
+                    wrap.className = "transcript-entry";
+                    const timeSpan = document.createElement("span");
+                    timeSpan.className = "entry-time";
+                    timeSpan.textContent = ts();
+                    const textSpan = document.createElement("span");
+                    textSpan.className = "entry-text";
+                    if (wakeRx.test(text)) {
+                        textSpan.innerHTML = text.replace(
+                            wakeRx,
+                            '<span class="wake-highlight">$1</span>',
+                        );
+                    } else {
+                        textSpan.textContent = text;
+                    }
+                    wrap.appendChild(timeSpan);
+                    wrap.appendChild(textSpan);
+                    scroll.appendChild(wrap);
+                    transcriptLog.push({ time: ts(), text });
+                }
+
+                scroll.scrollTop = scroll.scrollHeight;
+            }
+
+            /* ── chiku status UI ── */
+            function setChikuState(state, msg) {
+                // state: 'idle' | 'awake' | 'thinking' | 'speaking'
+                const el = document.getElementById("chikuStatus");
+                const msgEl = document.getElementById("chikuMsg");
+                el.className = "chiku-status";
+                msgEl.innerHTML = "";
+
+                if (state === "awake") {
+                    el.classList.add("awake");
+                    msgEl.textContent = msg || "Got it — processing...";
+                } else if (state === "speaking") {
+                    el.classList.add("speaking");
+                    const wave = document.createElement("div");
+                    wave.className = "wave";
+                    wave.innerHTML =
+                        "<span></span><span></span><span></span><span></span><span></span>";
+                    msgEl.textContent = "Speaking ";
+                    msgEl.appendChild(wave);
+                } else {
+                    msgEl.textContent =
+                        'Listening for "' + config.wake + '"...';
+                }
+            }
+
+            /* ── query log ── */
+            function addQueryLog(question) {
+                const section = document.getElementById("logSection");
+                const entry = document.createElement("div");
+                entry.className = "log-entry chiku-q";
+                entry.innerHTML = `
+    <div class="log-label">question</div>
+    <div class="log-time">${ts()}</div>
+    <div class="log-q">${question}</div>
+  `;
+                section.appendChild(entry);
+                section.scrollTop = section.scrollHeight;
+                queryLog.push({ time: ts(), question });
+            }
+
+            /* ── live dot ── */
+            function setLiveDot(state) {
+                const dot = document.getElementById("liveDot");
+                const lbl = document.getElementById("liveLabel");
+                const ring = document.getElementById("micRing");
+                if (state === "on") {
+                    dot.className = "live-dot active";
+                    lbl.textContent = "Live";
+                    ring.className = "mic-ring on";
+                    document.getElementById("micLabel").innerHTML =
+                        'Listening...<span>Say "hey Chiku" to ask</span>';
+                } else if (state === "wake") {
+                    dot.className = "live-dot wake-active";
+                    lbl.textContent = "Chiku";
+                    ring.className = "mic-ring wake";
+                } else {
+                    dot.className = "live-dot";
+                    lbl.textContent = "Idle";
+                    ring.className = "mic-ring";
+                    document.getElementById("micLabel").innerHTML =
+                        "Click to start<span>Microphone off</span>";
+                }
+            }
+
+            /* ── wake word detection ── */
+            function detectWake(transcript) {
+                const lower = transcript.toLowerCase();
+                const wakePhrase = config.wake.toLowerCase();
+                const idx = lower.indexOf(wakePhrase);
+                if (idx === -1) return null;
+                const query = transcript.slice(idx + wakePhrase.length).trim();
+                return query || null;
+            }
+
+            /* ── ask chiku via Groq (through FastAPI backend) ── */
+            async function askChiku(question) {
+                if (!question) return;
+                setChikuState("awake", "Thinking...");
+                setLiveDot("wake");
+                addQueryLog(question);
+
+                try {
+                    // Build a medical assistant prompt for Chiku
+                    const systemPrompt = `You are Chiku, a smart medical assistant helping a doctor during a consultation.
+The doctor is speaking in a mix of Kannada and English. When asked a question, answer concisely and clearly.
+If the question is a medical term or abbreviation in Kannada, explain it in simple English and Kannada both.
+Keep answers under 3 sentences. Be direct and clinical.`;
+
+                    let fullResponse = "";
+
+                    if (config.groq) {
+                        // Direct Groq call if API key provided
+                        const res = await fetch(
+                            "https://api.groq.com/openai/v1/chat/completions",
+                            {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    Authorization: "Bearer " + config.groq,
+                                },
+                                body: JSON.stringify({
+                                    model: "llama-3.3-70b-versatile",
+                                    messages: [
+                                        {
+                                            role: "system",
+                                            content: systemPrompt,
+                                        },
+                                        { role: "user", content: question },
+                                    ],
+                                    stream: true,
+                                    max_tokens: 200,
+                                }),
+                            },
+                        );
+
+                        const reader = res.body.getReader();
+                        const decoder = new TextDecoder();
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            const chunk = decoder.decode(value);
+                            for (const line of chunk.split("\n")) {
+                                if (!line.startsWith("data: ")) continue;
+                                const data = line.slice(6).trim();
+                                if (data === "[DONE]") break;
+                                try {
+                                    const parsed = JSON.parse(data);
+                                    const delta =
+                                        parsed.choices?.[0]?.delta?.content;
+                                    if (delta) fullResponse += delta;
+                                } catch (_) {}
+                            }
+                        }
+                    } else {
+                        // Route through FastAPI backend
+                        const res = await fetch(
+                            config.url + "/chat/completions",
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    messages: [
+                                        {
+                                            role: "system",
+                                            content: systemPrompt,
+                                        },
+                                        { role: "user", content: question },
+                                    ],
+                                }),
+                            },
+                        );
+
+                        const reader = res.body.getReader();
+                        const decoder = new TextDecoder();
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            const chunk = decoder.decode(value);
+                            for (const line of chunk.split("\n")) {
+                                if (!line.startsWith("data: ")) continue;
+                                const data = line.slice(6).trim();
+                                if (data === "[DONE]") break;
+                                try {
+                                    const parsed = JSON.parse(data);
+                                    const delta =
+                                        parsed.choices?.[0]?.delta?.content;
+                                    if (delta) fullResponse += delta;
+                                } catch (_) {}
+                            }
+                        }
+                    }
+
+                    if (fullResponse) {
+                        speakResponse(fullResponse);
+                    } else {
+                        setChikuState("idle");
+                        setLiveDot(isListening ? "on" : "off");
+                    }
+                } catch (e) {
+                    setChikuState("idle");
+                    setLiveDot(isListening ? "on" : "off");
+                    const dot = document.getElementById("connDot");
+                    const text = document.getElementById("connText");
+                    dot.className = "conn-dot err";
+                    text.textContent = "Chiku error: " + e.message;
+                }
+            }
+
+            /* ── TTS ── */
+            function speakResponse(text) {
+                isSpeaking = true;
+                setChikuState("speaking");
+
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.rate = 0.95;
+                utter.lang = "en-IN";
+
+                // try to pick an Indian English voice
+                const voices = speechSynthesis.getVoices();
+                const preferred = voices.find(
+                    (v) =>
+                        v.lang.startsWith("kn") ||
+                        v.lang === "en-IN" ||
+                        v.name.includes("India"),
+                );
+                if (preferred) utter.voice = preferred;
+
+                utter.onend = () => {
+                    isSpeaking = false;
+                    setChikuState("idle");
+                    setLiveDot(isListening ? "on" : "off");
+                };
+
+                utter.onerror = () => {
+                    isSpeaking = false;
+                    setChikuState("idle");
+                    setLiveDot(isListening ? "on" : "off");
+                };
+
+                speechSynthesis.speak(utter);
+            }
+
+            /* ── Web Speech Recognition ── */
+            function buildRecognition() {
+                const Rec =
+                    window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!Rec) {
+                    alert(
+                        "Your browser does not support Web Speech API. Please use Chrome or Edge.",
+                    );
+                    return null;
+                }
+
+                const r = new Rec();
+                r.continuous = true;
+                r.interimResults = true;
+                r.lang = "kn-IN"; // Kannada + English code-switching
+                r.maxAlternatives = 1;
+
+                r.onresult = (event) => {
+                    for (
+                        let i = event.resultIndex;
+                        i < event.results.length;
+                        i++
+                    ) {
+                        const result = event.results[i];
+                        const text = result[0].transcript.trim();
+
+                        if (result.isFinal) {
+                            addTranscriptEntry(text, false);
+
+                            // Wake word check — only if Chiku not already speaking
+                            if (!isSpeaking) {
+                                const query = detectWake(text);
+                                if (query) {
+                                    askChiku(query);
+                                }
+                            }
+                        } else {
+                            addTranscriptEntry(text, true);
+                        }
+                    }
+                };
+
+                r.onerror = (e) => {
+                    if (e.error === "no-speech") return; // ignore silence
+                    if (e.error === "aborted") return;
+                    console.warn("Speech recognition error:", e.error);
+                };
+
+                r.onend = () => {
+                    // auto-restart if we're still supposed to be listening
+                    if (isListening) {
+                        try {
+                            r.start();
+                        } catch (_) {}
+                    }
+                };
+
+                return r;
+            }
+
+            function toggleMic() {
+                if (isListening) {
+                    stopListening();
+                } else {
+                    startListening();
+                }
+            }
+
+            function startListening() {
+                if (!recognition) recognition = buildRecognition();
+                if (!recognition) return;
+
+                try {
+                    recognition.start();
+                    isListening = true;
+                    setLiveDot("on");
+                    sessionStart = Date.now();
+                    timerInterval = setInterval(() => {
+                        document.getElementById("timer").textContent =
+                            elapsedSince(sessionStart);
+                    }, 1000);
+                    checkConn();
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            function stopListening() {
+                isListening = false;
+                if (recognition) {
+                    try {
+                        recognition.stop();
+                    } catch (_) {}
+                }
+                setLiveDot("off");
+                clearInterval(timerInterval);
+                document.getElementById("micLabel").innerHTML =
+                    "Click to start<span>Microphone off</span>";
+                setChikuState("idle");
+            }
+
+            /* ── export ── */
+            function exportTranscript() {
+                if (!transcriptLog.length) {
+                    alert("No transcript to export yet.");
+                    return;
+                }
+                let txt = `CHIKU — DOCTOR SESSION TRANSCRIPT\nDate: ${new Date().toLocaleString()}\n\n`;
+                txt += transcriptLog
+                    .map((e) => `[${e.time}]  ${e.text}`)
+                    .join("\n");
+                if (queryLog.length) {
+                    txt += "\n\n── CHIKU QUERIES ──\n";
+                    txt += queryLog
+                        .map((q) => `[${q.time}]  Q: ${q.question}`)
+                        .join("\n");
+                }
+                const blob = new Blob([txt], { type: "text/plain" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `chiku-session-${new Date().toISOString().slice(0, 10)}.txt`;
+                a.click();
+            }
+
+            /* ── keyboard ── */
+            window.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") closeConfig();
+                if (e.key === " " && e.ctrlKey) {
+                    e.preventDefault();
+                    toggleMic();
+                }
+            });
+
+            document
+                .getElementById("configModal")
+                .addEventListener("click", (e) => {
+                    if (e.target === document.getElementById("configModal"))
+                        closeConfig();
+                });
+
+            /* ── init ── */
+            speechSynthesis.onvoiceschanged = () => {};
+            checkConn();
+        </script>
+    </body>
+</html>
